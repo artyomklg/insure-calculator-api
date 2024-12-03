@@ -1,0 +1,74 @@
+services:
+  app:
+    container_name: insuranse-calculator
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    depends_on:
+      - postgres
+      - kafka
+    command: sh -c "uvicorn --factory src.main:create_app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+
+  migrations:
+    container_name: insuranse-migrations
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    depends_on:
+      - postgres
+    command: sh -c "alembic upgrade head"
+    restart: "no"
+
+  postgres:
+    image: postgres:16.6
+    container_name: insuranse-postgres
+    env_file:
+      - .env.prod
+    ports:
+      - "6432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.8.0
+    container_name: insuranse-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    container_name: insuranse-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: insuranse-kafka-ui
+    ports:
+      - 8090:8080
+    restart: always
+    depends_on:
+      - kafka
+      - zookeeper
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+
+volumes:
+  postgres_data:
