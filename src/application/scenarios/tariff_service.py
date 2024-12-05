@@ -27,6 +27,9 @@ class TariffService:
         self._log_saver = log_saver
         self._tc = tc
 
+    async def get_available_cargo_types(self) -> list[str]:
+        return await self._tariff_reader.get_available_cargo_types()
+
     async def get_all(self) -> dict[datetime.date, list[TariffItem]]:
         tariffs = await self._tariff_reader.get_all_tariffs()
         response: dict[datetime.date, list[TariffItem]] = defaultdict(list)

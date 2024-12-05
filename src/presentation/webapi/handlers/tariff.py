@@ -3,7 +3,7 @@ from typing import Annotated
 
 from dishka import FromComponent
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Query
 
 from src.application.scenarios.calculate_insurence import CalculateInsuranse
 from src.application.scenarios.contracts.calculate_insurence import (
@@ -13,19 +13,42 @@ from src.application.scenarios.contracts.calculate_insurence import (
 from src.application.scenarios.contracts.tariff import TariffItem, TariffRequest
 from src.application.scenarios.tariff_service import TariffService
 from src.presentation.webapi.examples import REQUEST_EXAMPLE, RESPONSE_EXAMPLE
-from src.presentation.webapi.schemas.requests import TariffDTO
+from src.presentation.webapi.schemas.requests import CalculateInsuranseQuery, TariffDTO
 
-router = APIRouter(prefix="/tariff", route_class=DishkaRoute, tags=["Тарифы"])
+router = APIRouter()
 
 
-@router.post("/calculate", tags=["Расчёт стоимости страхования"])
+router_calculate = APIRouter(
+    prefix="/tariff", route_class=DishkaRoute, tags=["Расчёт стоимости страхования"]
+)
+
+
+@router_calculate.get("/calculate")
 async def calculate_insurance(
-    request_data: CalculateInsuranseRequest, action: Annotated[CalculateInsuranse, FromComponent()]
+    request_data: Annotated[CalculateInsuranseQuery, Query()],
+    action: Annotated[CalculateInsuranse, FromComponent()],
 ) -> CalculateInsuranseResponse:
-    return await action(request_data)
+    """Рассчёт стоимости страхования."""
+    return await action(
+        CalculateInsuranseRequest(
+            declared_value=request_data.declared_value,
+            cargo_type=request_data.cargo_type,
+        )
+    )
 
 
-@router.get("", responses=RESPONSE_EXAMPLE)
+router_tariffs = APIRouter(prefix="/tariff", route_class=DishkaRoute, tags=["Тарифы"])
+
+
+@router_tariffs.get("/cargo_types")
+async def get_available_cargo_types(
+    service: Annotated[TariffService, FromComponent()],
+) -> list[str]:
+    """Получение доступных типов груза."""
+    return await service.get_available_cargo_types()
+
+
+@router_tariffs.get("", responses=RESPONSE_EXAMPLE)
 async def get_all_tariffs(
     service: Annotated[TariffService, FromComponent()],
 ) -> dict[datetime.date, list[TariffItem]]:
@@ -33,9 +56,7 @@ async def get_all_tariffs(
     return await service.get_all()
 
 
-@router.get(
-    "/{date}",
-)
+@router_tariffs.get("/{date}")
 async def get_tariff_by_date(
     date: datetime.date, service: Annotated[TariffService, FromComponent()]
 ) -> list[TariffItem]:
@@ -43,7 +64,7 @@ async def get_tariff_by_date(
     return await service.get_by_date(date)
 
 
-@router.post("")
+@router_tariffs.post("")
 async def upload_tariffs(
     request_data: Annotated[
         dict[datetime.date, list[TariffDTO]], Body(embed=False, example=REQUEST_EXAMPLE)
@@ -67,7 +88,7 @@ async def upload_tariffs(
     )
 
 
-@router.post("/{date}")
+@router_tariffs.post("/{date}")
 async def append_tariff_by_date(
     date: datetime.date,
     request_data: Annotated[list[TariffDTO], Body(embed=False)],
@@ -85,7 +106,7 @@ async def append_tariff_by_date(
     )
 
 
-@router.put("")
+@router_tariffs.put("")
 async def change_tariffs(
     request_data: Annotated[
         dict[datetime.date, list[TariffDTO]], Body(embed=False, example=REQUEST_EXAMPLE)
@@ -106,7 +127,7 @@ async def change_tariffs(
     )
 
 
-@router.patch("/{date}")
+@router_tariffs.patch("/{date}")
 async def change_tariff_by_date(
     date: datetime.date,
     request_data: Annotated[list[TariffDTO], Body(embed=False)],
@@ -124,15 +145,19 @@ async def change_tariff_by_date(
     )
 
 
-@router.delete("")
+@router_tariffs.delete("")
 async def delete_all_tariffs(service: Annotated[TariffService, FromComponent()]) -> None:
     """Очищает все тарифы в хранилище."""
     return await service.delete_all()
 
 
-@router.delete("/{date}")
+@router_tariffs.delete("/{date}")
 async def delete_tariff_by_date(
     date: datetime.date, service: Annotated[TariffService, FromComponent()]
 ) -> None:
     """Очищает тарифы на конкретную дату."""
     return await service.delete_by_date(date)
+
+
+router.include_router(router_calculate)
+router.include_router(router_tariffs)

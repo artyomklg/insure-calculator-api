@@ -30,6 +30,10 @@ class SqlalchemyTariffRepository(SqlalchemySessionMixin):
             date=tariff.date,
         )
 
+    async def get_available_cargo_types(self) -> Sequence[str]:
+        res = await self._session.execute(select(TariffORM.cargo_type.distinct()))
+        return res.scalars().all()
+
     async def get_all_tariffs(self) -> list[Tariff]:
         res = await self._session.execute(select(TariffORM))
         return [

@@ -9,6 +9,9 @@ class ITariffReader(Protocol):
     async def get_actual_tariff_by_type(self, cargo_type: str) -> ITariff | None:
         """Взять актуальный (самый новый по дате) тариф по его типу, либо ничего."""
 
+    async def get_available_cargo_types(self) -> list[str]:
+        """Взять доступные типы грузов."""
+
     async def get_all_tariffs(self) -> list[Tariff]:
         """Взять все тарифы. Отсортировано по уменьшению даты."""
 
